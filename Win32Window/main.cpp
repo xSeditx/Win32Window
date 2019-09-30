@@ -1,6 +1,6 @@
 
 #include"NativeWin32.h"
-
+#include"Application.h"
 
 int main()
 {

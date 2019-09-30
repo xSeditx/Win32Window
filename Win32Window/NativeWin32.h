@@ -1,16 +1,18 @@
 #pragma once
-#include"Windows.h"
+
+#include<unordered_map>
+#include<Windows.h>
 #include<iostream>
-#include<cstdint> /* Type defines */
+#include<cstdint>    /* Type defines */
 #include<string>
 #include<stack>
 #include<queue>
-#include<unordered_map>
+
+
 /*
 
    NATIVE WIN32 Window MODULE
    ==========================
-
 
    Location Handling
 ----------------------------------------------------------
@@ -23,7 +25,6 @@
 _________________________________________________________
 
 
-
     Dimensions
 ---------------------------------------------------------
     Vec2 g_Size() { return Size; }
@@ -31,14 +32,51 @@ _________________________________________________________
 	int Height()  { return Size.y; }
 _________________________________________________________
 
+    HWND g_Handle()    const        Returns the Native Windows Handle (HWND) of the Window  
+    Window& g_Parent() const        Return the Parent Window if this is a Child 
+    Window& s_Parent() const        Sets the Parent Window if this is a Child 
+
+ Changes with Window size and OpenGL Viewport settings 
+    void ResizeWindow(uint32_t _x, uint32_t _y);  
+
+
 */
+
+/// Awesome conversion of a basic Win32 Hello Window to every language imaginable 
+/// http://nehe.gamedev.net/tutorial/creating_an_opengl_window_(win32)/13001/
+
+#include<GL/gl.h>
+#include<GL/glu.h>
+
+#pragma comment(lib, "shell32.lib")
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "gdi32.lib")
+
+#pragma comment(lib, "vcruntime.lib")
+#pragma comment(lib, "msvcrt.lib")
+#pragma comment(lib, "Ws2_32.lib")
+
+#pragma comment(lib, "opengl32.lib")
+#pragma comment(lib, "glu32.lib")
+#pragma comment(lib, "gdiplus.lib")
+
+
+
+///================================================================================================================
+///====================== VARIOUS HELPERS =========================================================================
+///================================================================================================================
+
+//#define _STACK_TRACE_
+
+/* Convinence for readability*/
 #define REMOVE_MESSAGE 0
-#define _STACK_TRACE_
 #define _EQUALS_       ==
 #define _OR_           ||
-#define _static /* Convinence for readability*/
+#define _AND_          &&
+#define _static 
 #define pure_virtual   0
 
+/* Trace calls in and our of specified functions */
 #ifdef _STACK_TRACE_
 #    define trace_IN(x)   std::cout << "IN: "<< x << typeid(this).name() << "\n"
 #    define trace_OUT(x)  std::cout <<"OUT: "<< x << typeid(this).name() << "\n"
@@ -46,10 +84,19 @@ _________________________________________________________
 #    define trace_IN(x)   
 #    define trace_OUT(x)  
 #endif
+
+/* Just basic Logger */
 #define Print(x) std::cout << x << '\n'
+
 typedef  MSG  Event;
 
 #ifndef Vec2
+
+///====================================================================================================================================
+///================ INCASE A VECTOR HAS NOT BEEN DEFINED ===============================================================================================
+///====================================================================================================================================
+
+
 template<typename _Ty>
 struct vec2_point
 {
@@ -69,6 +116,94 @@ struct vec2_point
 typedef vec2_point<float>  Vec2;
 typedef vec2_point<int>   iVec2;
 #endif
+#ifdef _REFLECTION /// Soon to be basic Reflection system. 
+template<typename _Ty, bool HasMyType>
+struct _get_meta
+{
+	static const TypeInfo *Get() { return _Ty::MyType(); }
+};
+template<typename _Ty>
+struct _get_meta<_Ty, false> 
+{
+	static const TypeInfo *Get() { return TypeHolder<_Ty>::GetAcceptExSockaddrs(); }
+};
+
+template<typename _Ty> const TypeInfo *get_meta()
+{
+	return _get_meta<Type, has_mytype<_Ty>::value_compare>::GetAcceptExSockaddrs();
+}
+
+struct Any
+{
+	void *Ptr;
+	const TypeInfo *Type;
+public:
+	template<typename _Ty>
+		Any(_Ty *_obj) 
+			:
+			Ptr(_obj), 
+			Type(get_meta<Type>::get())
+		{}
+
+
+		template<typename _Ty>
+		_Ty *g_Ptr()
+		{
+			return Type->AdjustToBase(Ptr, Type);
+		}
+
+		template<typename _ClassTy, typename _Arg_Ty>
+		struct MemberInfo0 : public MemberInfo 
+		{
+			virtual void Call(void * obj, Any* _argv)
+			{
+				(static_cast<_ClassTy>(_obj)->Method) (*_argv[0]->g_Ptr<typename std::remove_reference<ArgTy>::type>());
+			}
+		};
+};
+#endif
+
+///================================================================================================================
+///================= SIMPLE ERROR HANDLING ========================================================================
+///================================================================================================================
+
+
+struct ErrorMessage
+{
+	ErrorMessage(uint32_t _error, uint32_t _level)
+		:
+	 Level(_level),
+	 ErrorNumber(_error)
+	{
+		GetSystemTime(Time);
+	}
+	uint32_t Level;
+	uint32_t ErrorNumber;
+	LPSYSTEMTIME Time;
+
+	static bool isError() { return !Errors.empty(); }
+	static void RaiseException(uint32_t _error, uint32_t _level)
+	{
+		Errors.push({ _error, _level });
+	}
+	static bool GetError(ErrorMessage& _msg)
+	{
+		if (isError())
+		{
+			_msg = Errors.top();
+			Errors.pop();
+		}
+		return Errors.empty();
+	}
+	static std::stack<ErrorMessage> Errors;
+	friend std::ostream& operator <<(std::ostream& os, ErrorMessage& _msg);
+};
+std::ostream& operator <<(std::ostream& os, ErrorMessage& _msg);
+
+
+///================================================================================================================
+///============================ INPUT DEVICE STATE ================================================================
+///================================================================================================================
 
 
 struct Input
@@ -83,23 +218,20 @@ struct Input
 
 	struct _keyboard
 	{
-		uint32_t *Keys;
+		bool Keys[256];
 	}static Keyboard;
 };
 
-
-enum WindowFlags
-{
-	RESIZABLE, BORDERLESS, CHILD_WINDOW, OPENGL
-};
-
+///================================================================================================================
+///====================== WINDOW SYSTEM  ==========================================================================
+///================================================================================================================
 
 
 class Window
 {
 public:
-	Window(uint32_t _width, uint32_t _height, std::string _name, WindowFlags _flags);// = RESIZABLE);
-	Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _name, WindowFlags _flags = RESIZABLE);
+	Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flags);// = RESIZABLE);
+	Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _name, DWORD _flags = 0);
 
 	/* Returns Windows Position */
 	Vec2   g_Position()           { return Position; }
@@ -123,30 +255,40 @@ public:
 	Vec2 g_Size()                 { return Size; }
 
 	/* Return the Width dimension of a Window */
-	int Width()                   { return Size.x; }
+	int Width()                   { return (int)Size.x; }
 
 	/* Return the Height Dimension of a Window */
-	int Height()                  { return Size.y; }
+	int Height()                  { return (int)Size.y; }
 
 	/* Return if the Window is Alive  
 	Note: A Window can be invisible and still be Alive. When the final Window is no longer Alive our Application will terminate
 	*/
-	bool isAlive() { return Alive; }
+	bool isAlive() const   { return Alive; }
 
 	/* Let us know if the Window is currently Visible on Screen 
 	Note: Intentions are to hide all child Windows if Parent becomes invisible*/
-	bool isVisible() { return Visible; }
+	bool isVisible() const { return Visible; }
 
 	/* Allow us to see if the Window in Question is the Currently Active window on the screen */
-	bool isActive() { return Active; }
-
-
+	bool isActive() const  { return Active; }
 
 	/* Display the contents of the back buffer to the Screen (*note:future at VSync if Specified) */
-	void Sync(){}
+	void Sync() { SwapBuffers(DeviceContext); }
 
 	/* Clear the Contents of the BackBuffer */
-	void CLS(){}
+	void CLS()	{ glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  }       // Clear The Screen And The Depth Buffer
+
+	/* Returns the Native Windows Handle (HWND) of the Window */
+	const HWND g_Handle() const { return Handle; }
+
+	/* Return the Parent Window if this is a Child */
+	Window& g_Parent() const { return *Parent; }
+
+	/* Sets the Parent Window if this is a Child */
+   	Window& s_Parent() const { return *Parent; }
+
+	/* Changes with Window size and OpenGL Viewport settings */
+	void ResizeWindow(uint32_t _x, uint32_t _y);
 private:
 
 	bool Active  = true;
@@ -155,87 +297,24 @@ private:
 
 	Window *Parent = nullptr;
 	HWND Handle{ 0 };
-
+	HDC DeviceContext{ 0 };
 	Vec2 Size{ 0,0 };
 	Vec2 Position{ 0,0 };
+
+	WNDCLASS    WindowProperties = { 0 };
+	PIXELFORMATDESCRIPTOR PixelFormatDescriptor{ 0 };
+	int         PixelFormat{ 0 };
 	std::string Title{ "" };
 };
 
-
-///====================================================================================================================================
-///====================================================================================================================================
-///====================================================================================================================================
+///================================================================================================================
+///=========================== LISTENER CALLBACK BASE =============================================================
+///================================================================================================================
 
 
 typedef uint32_t MsgType;
 typedef uint32_t WindowID;// This will likely change to a pointer, or some other form later on.
 //============================================================
-class Window;
-
-/*
-struct MYSTIC Event
-{// Event Union Defining an Event the Engine can produce
-	Event();
-	Event(MsgType msg);
-
-	MsgType ID;
-	WindowID WinID;
-	unsigned long Time;
-
-#pragma pack(push, 1)
-	union msgUnion
-	{// All messages are 128 bits
-		msgUnion() = default;
-
-		msgUnion &operator =(const msgUnion&other)
-		{
-			memcpy(this, &other, sizeof(other)); // Should be 16 bytes, check this if any changes get made
-			return *this;
-		}
-
-		struct msgstruct
-		{
-			uint32_t wordParam;
-			uint64_t longParam;
-			uint32_t Padding;
-		}MSG; // 128 bits
-		struct kbstruct
-		{
-			uint32_t KeyCode;
-			uint32_t ScanCode;
-			uint32_t Action;
-			uint32_t Mods;
-		}Keyboard; // 128
-		struct mousestruct
-		{
-			uint32_t Button;
-			uint32_t x;
-			uint32_t y;
-			int16_t relX;
-			int16_t relY;
-		}Mouse; // 128
-		struct buttonstruct
-		{
-			struct buttons
-			{
-				uint8_t
-					Left,
-					Right,
-					Middle,
-					Wheel;
-			}Buttons; // 32
-			uint32_t Action;
-			uint32_t Modification;
-			uint32_t Padding;
-		}MouseButton; // 128
-		struct textstruct {}TextInput;
-	}data;
-#pragma pack(pop)
-
-	bool Handled() { return (ID == 0); }
-};
-*/
-
 
 struct Listener
 {
@@ -255,6 +334,11 @@ public:
 private:
 	void(*_handler)(Event msg);
 };
+
+///================================================================================================================
+///========================= PUBLISHER SUBSCRIBER SYSTEM ==========================================================
+///================================================================================================================
+
 
 class EventSystem
 {// Singleton design pattern
@@ -278,18 +362,23 @@ private:
 };
 
 
-///====================================================================================================================================
-///====================================================================================================================================
-///====================================================================================================================================
+///================================================================================================================
+///===================== APPLICATION CLASS ========================================================================
+///================================================================================================================
 
-
-/* =============================================================================================================================================================
- APPLICATION
--------------
-
--------------
-
-================================================================================================================================================================ */
+/*=====================================================================================================
+_________________________________ APPLICATION CLASS ___________________________________________________
+=======================================================================================================
+  Application class Abstracts away functionality of the application itself. It handles some important
+  Messages such as Keyboard or Mouse Events. The User can define a handler for all Keyboard or Mouse
+  Events however if they chose not to they can instead define specific Key or Mouse events such as
+  a Handler for only the Left Mouse click or one for Only the Key Repeat.
+  If the User does not define a specific Generic handler one has been supplied which calls the
+  appropritate sub functionality for the input device
+=========================================================================================================
+USAGE:
+=========================================================================================================
+*/
 
 
 class Application
@@ -311,6 +400,14 @@ public:
 
 	Window *ApplicationWindow;
 	bool Running = true;
+
+	static HINSTANCE Instance;
+
+//ApplicationWindow.g_Handle();
+static Window& ActiveWindow() { return *FocusedWindow; }
+static Window *FocusedWindow;
+static void s_WindowFocus(Window& _win) { FocusedWindow = &_win; }
+
 protected:
 
 	virtual void OnCreate();
@@ -328,7 +425,6 @@ protected:
 
 	//Timer ApplicationTimer;
 
-protected:
 
 	void SetHints();
 	void SetStereo(bool);
@@ -375,18 +471,292 @@ private: // Window Information. Default Properties will be set however user can 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 ///====================================================================================================================================
+///===================== TRASH  ======================================================================================
 ///====================================================================================================================================
-///====================================================================================================================================
+// Sets the Properties defined in the Hint Structure for the Application
+
+	/*
+	DEBUG_TRACE("I Do not Like this, Not one single bit, I want this Hint structure to be in the Window Class however I want to be able to assign properties using the SetWindowProperties. There is a problem because I have to Initialize GLFW before and that is in the Window Struct. I will likely Initialize GLFW in the System Manager or something.")
+		glfwWindowHint(GLFW_RESIZABLE, Hints.WindowStyle.RESIZABLE);
+	glfwWindowHint(GLFW_VISIBLE, Hints.WindowStyle.VISIBLE);
+	glfwWindowHint(GLFW_DECORATED, Hints.WindowStyle.DECORATED);
+	// For VR type stuff
+	glfwWindowHint(GLFW_STEREO, Hints.Random.STEREO);
+	glfwWindowHint(GLFW_SRGB_CAPABLE, Hints.Random.SRGB_CAPABLE);
+	// --------- Following Create the Default Framebuffer for the Window being created --------
+	// Color Bits
+	glfwWindowHint(GLFW_RED_BITS, Hints.FrameBuffer.RED_BITS);
+	glfwWindowHint(GLFW_GREEN_BITS, Hints.FrameBuffer.GREEN_BITS);
+	glfwWindowHint(GLFW_BLUE_BITS, Hints.FrameBuffer.BLUE_BITS);
+	glfwWindowHint(GLFW_ALPHA_BITS, Hints.FrameBuffer.ALPHA_BITS);
+	// Depth and Stencil Buffer bits
+	glfwWindowHint(GLFW_DEPTH_BITS, Hints.FrameBuffer.DEPTH_BITS);
+	glfwWindowHint(GLFW_STENCIL_BITS, Hints.FrameBuffer.STENCIL_BITS);
+	// Accumulation Bits
+	glfwWindowHint(GLFW_ACCUM_RED_BITS, Hints.FrameBuffer.ACCUM_RED_BITS);
+	glfwWindowHint(GLFW_ACCUM_GREEN_BITS, Hints.FrameBuffer.ACCUM_GREEN_BITS);
+	glfwWindowHint(GLFW_ACCUM_BLUE_BITS, Hints.FrameBuffer.ACCUM_BLUE_BITS);
+	glfwWindowHint(GLFW_ACCUM_ALPHA_BITS, Hints.FrameBuffer.ACCUM_ALPHA_BITS);
+	//-------------------------------------------------------------------------------------------
+	glfwWindowHint(GLFW_AUX_BUFFERS, Hints.FrameBuffer.AUX_BUFFERS);
+	// Anti Aliasing Sampling rates
+	glfwWindowHint(GLFW_SAMPLES, Hints.FrameBuffer.SAMPLES);
+	glfwWindowHint(GLFW_REFRESH_RATE, Hints.FrameBuffer.REFRESH_RATE);
+	// OpenGL Context Creation
+	glfwWindowHint(GLFW_CLIENT_API, Hints.Context.CLIENT_API);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, Hints.Context.CONTEXT_VERSION_MAJOR);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, Hints.Context.CONTEXT_VERSION_MINOR);
+	glfwWindowHint(GLFW_CONTEXT_ROBUSTNESS, Hints.Context.CONTEXT_ROBUSTNESS);
+	//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, Hints.Context.FORWARD_COMPAT);
+	//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, Hints.Context.OPENGL_DEBUG_CONTEXT);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, Hints.Context.OPENGL_PROFILE);
+}
+void Application::SetStereo(bool param)
+{
+	Hints.Random.STEREO = param;
+}
+void Application::sRGBCapable(bool param)
+{
+	Hints.Random.SRGB_CAPABLE = param;
+}
+void Application::ForwardCompatible(bool param)
+{
+	Hints.Random.OPENGL_FORWARD_COMPAT = param;
+}
+void Application::DebugContext(bool param)
+{
+	Hints.Random.OPENGL_DEBUG_CONTEXT = param;
+}
+void Application::ResizableWindow(bool param)
+{
+	Hints.WindowStyle.RESIZABLE = param;
+}
+void Application::VisibleWindow(bool param)
+{
+	Hints.WindowStyle.VISIBLE = param;
+}
+void Application::DecoratedWindow(bool param)
+{
+	Hints.WindowStyle.DECORATED = param;
+}
+void Application::SetRedBits(unsigned int param)
+{
+	Hints.FrameBuffer.RED_BITS = param;
+}
+void Application::SetGreenBits(unsigned int param)
+{
+	Hints.FrameBuffer.GREEN_BITS = param;
+}
+void Application::SetBlueBits(unsigned int param)
+{
+	Hints.FrameBuffer.BLUE_BITS = param;
+}
+void Application::SetAlphaBits(unsigned int param)
+{
+	Hints.FrameBuffer.ALPHA_BITS = param;
+}
+void Application::SetDepthBits(unsigned int param)
+{
+	Hints.FrameBuffer.DEPTH_BITS = param;
+}
+void Application::SetStencilBits(unsigned int param)
+{
+	Hints.FrameBuffer.STENCIL_BITS = param;
+}
+void Application::SetAccumulatorRedBits(unsigned int param)
+{
+	Hints.FrameBuffer.ACCUM_RED_BITS = param;
+}
+void Application::SetAccumulatorGreenBits(unsigned int param)
+{
+	Hints.FrameBuffer.ACCUM_GREEN_BITS = param;
+}
+void Application::SetAccumulatorBlueBits(unsigned int param)
+{
+	Hints.FrameBuffer.ACCUM_BLUE_BITS = param;
+}
+void Application::SetAccumulatorAlphaBits(unsigned int param)
+{
+	Hints.FrameBuffer.ACCUM_ALPHA_BITS = param;
+}
+void Application::SetAuxiliaryBits(unsigned int param)
+{
+	Hints.FrameBuffer.AUX_BUFFERS = param;
+}
+void Application::SetNumberOfSamples(unsigned int param)
+{
+	Hints.FrameBuffer.SAMPLES = param;
+}
+void Application::SetRefreshRate(unsigned int param)
+{
+	Hints.FrameBuffer.REFRESH_RATE = param;
+}
+void Application::UseOpenGLClient(unsigned int param)
+{
+	Hints.Context.CLIENT_API = param;
+}
+void Application::UseOpenGLESClient(unsigned int param)
+{
+	Hints.Context.CONTEXT_VERSION_MAJOR = param;
+}
+void Application::SetMajorVersion(unsigned int param)
+{
+	Hints.Context.CONTEXT_VERSION_MINOR = param;
+}
+void Application::SetMinorVersion(unsigned int param)
+{
+	Hints.Context.CONTEXT_ROBUSTNESS = param;
+}
+void Application::UseOpenGLProfile(unsigned int param)
+{
+	Hints.Context.OPENGL_PROFILE = param;
+}
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+//int APIENTRY
+//WinMain(HINSTANCE hCurrentInst, HINSTANCE hPreviousInst,
+//	LPSTR lpszCmdLine, int nCmdShow)
+//{
+//	HDC hDC;				/* device context */
+//	HGLRC hRC;				/* opengl context */
+//	HWND  hWnd;				/* window */
+//	MSG   msg;				/* message */
+//
+//	Window T =  Window(0,0,std::string("blah"),(WindowFlags) NULL);
+//
+////
+////	hDC = GetDC(hWnd);
+////	hRC = wglCreateContext(hDC);
+////	wglMakeCurrent(hDC, hRC);
+//
+//	
+//
+//	while (GetMessage(&msg, T.hWnd, 0, 0)) {
+//		TranslateMessage(&msg);
+//		DispatchMessage(&msg);
+//	}
+////  
+////  wglMakeCurrent(NULL, NULL);
+////  ReleaseDC(hWnd, hDC);
+////  wglDeleteContext(hRC);
+////  DestroyWindow(hWnd);
+////  
+//	return msg.wParam;
+//}
+
+//
+//int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+//{
+//	MSG msg;
+//	BOOL bRet;
+//
+//	while (1)
+//	{
+//		bRet = GetMessage(&msg, NULL, 0, 0);
+//
+//		if (bRet > 0)  // (bRet > 0 indicates a message that must be processed.)
+//		{
+//			TranslateMessage(&msg);
+//			DispatchMessage(&msg);
+//		}
+//		else if (bRet < 0)  // (bRet == -1 indicates an error.)
+//		{
+//			// Handle or log the error; possibly exit.
+//			// ...
+//		}
+//		else  // (bRet == 0 indicates "exit program".)
+//		{
+//			break;
+//		}
+//	}
+//	return msg.wParam;
+//}
+
+
+
+
+
+
+// Register the window class.
+///const wchar_t CLASS_NAME[] = L"Main Window class"; /// TODO This Needs to become a base Window Class type
+///HINSTANCE AppInstance = 0;//. GetModuleHandle(NULL);
+///WNDCLASS wc = { };
+///
+///wc.lpfnWndProc = WindowProc;
+///wc.hInstance = AppInstance;// TODO: This should be in an Application class This will not work if executed in a DLL
+///wc.style = CS_DBLCLKS | CS_PARENTDC;
+///wc.cbClsExtra = 0;
+///wc.cbWndExtra = 0;
+///wc.hIcon = NULL;
+///wc.hCursor = LoadCursor(NULL, (LPTSTR)IDC_IBEAM);
+///wc.hbrBackground = NULL;
+///wc.lpszMenuName = NULL;
+///wc.lpszClassName = (LPCSTR)CLASS_NAME;
+///
+///RegisterClass(&wc);
+///
+///// Create the window.
+///
+///Handle = CreateWindowEx
+///(
+///	0,                                    // Optional window styles.
+///	(LPCSTR)CLASS_NAME,                   // Window class
+///	(LPCSTR)L"Learn to Program Windows",  // Window text
+///	WS_OVERLAPPEDWINDOW,                  // Window style
+///
+///	// Size and position
+///	CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+///
+///	NULL, //Parent->Handle,       // Parent window    
+///	NULL,       // Menu
+///	AppInstance,  // Instance handle
+///	NULL        // Additional application data
+///);
+///
+///if (Handle == NULL)
+///{
+///	__debugbreak();
+///}
+///
+///ShowWindow(Handle, SW_SHOW);
+
+
+
+//TODO: Setup a Window Creation function
+
+//--------Gathering information about OpenGL state and Display it -----------------------------------------------
+//  int NumberOfExtensions = 0;
+//  _GL(glGetIntegerv(GL_NUM_EXTENSIONS, &NumberOfExtensions));
+//  
+//  for (int i = 0; i < NumberOfExtensions; i++) {
+//  	const GLubyte *ccc = glGetStringi(GL_EXTENSIONS, i);
+//  	Print(ccc);
+//  }
+
+//const GLubyte *extensions = glGetString(GL_EXTENSIONS);
+//Print(extensions);
+//Print("");
+//Print("OpenGL Version: " << glGetString(GL_VERSION));
+//Print("Renderer: " << glGetString(GL_RENDERER));
+//Print("Current Context: "; Print(glGetCurrentContext()));
+
+//-------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
 

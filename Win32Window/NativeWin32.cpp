@@ -2,81 +2,242 @@
 
 _static Input::_mouse Input::Mouse;
 _static Input::_keyboard Input::Keyboard;
+_static HINSTANCE Application::Instance = 0;
+_static std::stack<ErrorMessage> ErrorMessage::Errors;
+_static Window * Application::FocusedWindow;
 
+std::ostream& operator <<(std::ostream& os, ErrorMessage& _msg)
+{
+	os << "Error: " << _msg.ErrorNumber << "\n At: " << _msg.Time << "\n ";
+	return os;
+}
 
-
+///==================================================================================================================
+///====================== WINDOW SYSTEM  ============================================================================
+///==================================================================================================================
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	return (LRESULT)0;
+	Print("Callback:" << uMsg);
+	switch (uMsg)
+	{
+
+	case WM_ACTIVATE:                       // Watch For Window Activate Message
+	{
+		if (!HIWORD(wParam))                    // Check Minimization State
+		{
+			Print("Active");                    // Program Is Active
+		}
+		else
+		{
+			Print("Inactive");                    // Program Is No Longer Active
+		}
+
+		return 0;                       // Return To The Message Loop
+	}
+
+	case WM_SYSCOMMAND:                     // Intercept System Commands
+	{
+		switch (wParam)                     // Check System Calls
+		{
+		case SC_SCREENSAVE:             // Screensaver Trying To Start?
+		case SC_MONITORPOWER:               // Monitor Trying To Enter Powersave?
+			return 0;                   // Prevent From Happening
+		}
+		break;                          // Exit
+	}
+
+	case WM_CLOSE:                          // Did We Receive A Close Message?
+	{
+		PostQuitMessage(0);                 // Send A Quit Message
+		return 0;                       // Jump Back
+	}
+
+	case WM_KEYDOWN:                        // Is A Key Being Held Down?
+	{
+		Input::Keyboard.Keys[wParam] = TRUE;                    // If So, Mark It As TRUE
+		return 0;                       // Jump Back
+	}
+
+	case WM_KEYUP:                        // Is A Key Being Held Down?
+	{
+		Input::Keyboard.Keys[wParam] = TRUE;                    // If So, Mark It As TRUE
+		return 0;                       // Jump Back
+	}
+
+
+	case WM_SIZE:                           // Resize The OpenGL Window
+	{
+		Print("Resize the window here");
+		//ReSizeGLScene(LOWORD(lParam), HIWORD(lParam));       // LoWord=Width, HiWord=Height
+		return 0;                       // Jump Back
+	}
+	}
+
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-
-Window::Window(uint32_t _width, uint32_t _height, std::string _name, WindowFlags _flags)
+Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flags)
 	:
 	Parent(nullptr),
 	Size({ (float)_width, (float)_height }),
 	Title(_name)
 {
 	trace_IN("");
+ 
+	const char* title = { "Test Window" };
 
-// Register the window class.
-	const wchar_t CLASS_NAME[] = L"Main Window class"; /// TODO This Needs to become a base Window Class type
-	HINSTANCE AppInstance = GetModuleHandle(NULL);
-	WNDCLASS wc = { };
-	
-	wc.lpfnWndProc = WindowProc;
-	wc.hInstance = AppInstance;// TODO: This should be in an Application class This will not work if executed in a DLL
-	wc.style = CS_DBLCLKS | CS_PARENTDC;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hIcon = NULL;
-	wc.hCursor = LoadCursor(NULL, (LPTSTR)IDC_IBEAM);
-	wc.hbrBackground = NULL;
-	wc.lpszMenuName = NULL;
-	wc.lpszClassName = (LPCSTR)CLASS_NAME;
+ 	if (!Application::Instance)
+	{// TODO: Just do this  in the Application class as that should be responsible for registering its various Class styles
+		Application::Instance = GetModuleHandle(NULL);
+		WindowProperties.style = CS_HREDRAW| CS_VREDRAW |CS_OWNDC;
+		WindowProperties.lpfnWndProc = (WNDPROC)WindowProc;
+		WindowProperties.cbClsExtra = 0;
+		WindowProperties.cbWndExtra = 0;
+		WindowProperties.hInstance = Application::Instance;
+		WindowProperties.hIcon = LoadIcon(NULL, IDI_WINLOGO);
+		WindowProperties.hCursor = LoadCursor(NULL, IDC_ARROW);
+		WindowProperties.hbrBackground = NULL;
+		WindowProperties.lpszMenuName = NULL;
+		WindowProperties.lpszClassName = "OpenGL";
 
-	RegisterClass(&wc);
+		if (!RegisterClass(&WindowProperties))
+		{
+			MessageBox(NULL, "RegisterClass() failed:  "
+				"Cannot register window class.", "Error", MB_OK);
+			__debugbreak();
+		}
+	}
 
-	// Create the window.
-
-	Handle = CreateWindowEx
+	if(!(Handle = CreateWindow
 	(
-		0,                                    // Optional window styles.
-		(LPCSTR)CLASS_NAME,                   // Window class
-		(LPCSTR)L"Learn to Program Windows",  // Window text
-		WS_OVERLAPPEDWINDOW,                  // Window style
-
-		// Size and position
-		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-
-		NULL, //Parent->Handle,       // Parent window    
-		NULL,       // Menu
-		AppInstance,  // Instance handle
-		NULL        // Additional application data
-	);
-
-	if (Handle == NULL)
+		"OpenGL", 
+		title, 
+		WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+		(int)Position.x,(int) Position.y, (int)Size.x, (int)Size.y,
+		NULL,
+		NULL, 
+		Application::Instance,
+		NULL
+	)))
 	{
+		MessageBox(NULL, "CreateWindow() failed:  Cannot create a window. Error",
+			"Error", MB_OK);
 		__debugbreak();
 	}
 
-	ShowWindow(Handle, SW_SHOW);
-	trace_OUT("");
-}
+	DeviceContext = GetDC(Handle);
 
-Window::Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _name, WindowFlags _flags)
+	/* there is no guarantee that the contents of the stack that become
+	   the pfd are zeroed, therefore _make sure_ to clear these bits. */
+	memset(&PixelFormatDescriptor, 0, sizeof(PixelFormatDescriptor));
+	PixelFormatDescriptor.nSize = sizeof(PixelFormatDescriptor);
+	PixelFormatDescriptor.nVersion = 1;
+	PixelFormatDescriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | _flags;
+	PixelFormatDescriptor.iPixelType = PFD_TYPE_RGBA;
+	PixelFormatDescriptor.cColorBits = 32;
+
+	PixelFormat = 
+		ChoosePixelFormat
+		(
+			DeviceContext, 
+			&PixelFormatDescriptor
+		);
+
+	if (PixelFormat _EQUALS_ NULL)
+	{
+		MessageBox
+		(
+			NULL, 
+			"ChoosePixelFormat() failed:  "
+			"Cannot find a suitable pixel format.",
+			"Error",
+			MB_OK
+		);
+		__debugbreak();
+	}
+
+	if (SetPixelFormat(DeviceContext, PixelFormat, &PixelFormatDescriptor) _EQUALS_ FALSE)
+	{
+		MessageBox
+		(
+			NULL,
+			"SetPixelFormat() failed:  "
+			"Cannot set format specified.", 
+			"Error",
+			MB_OK
+		);
+		__debugbreak();
+	}
+
+	DescribePixelFormat
+	(
+		DeviceContext,
+		PixelFormat, 
+		sizeof(PIXELFORMATDESCRIPTOR),
+		&PixelFormatDescriptor
+	);
+
+	ReleaseDC(Handle, DeviceContext);
+	ShowWindow(Handle, SW_SHOW);
+
+	glShadeModel(GL_SMOOTH);
+	glClearColor(0.0f, 0.0f, 1.0f, 0.0f);                   // Black Background
+	glClearDepth(1.0f);                         // Depth Buffer Setup
+	glEnable(GL_DEPTH_TEST);                        // Enables Depth Testing
+	glDepthFunc(GL_LEQUAL);                         // The Type Of Depth Test To Do
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);          // Really Nice Perspective Calculations
+	/// DEPRECATED I THINK 
+
+	SetForegroundWindow(Handle);                      // Slightly Higher Priority
+	SetFocus(Handle);
+													  
+													  
+													  /*
+	FULL SCREEN MODE 
+
+	DEVMODE dmScreenSettings;                   // Device Mode
+memset(&dmScreenSettings,0,sizeof(dmScreenSettings));       // Makes Sure Memory's Cleared
+dmScreenSettings.dmSize=sizeof(dmScreenSettings);       // Size Of The Devmode Structure
+dmScreenSettings.dmPelsWidth    = width;            // Selected Screen Width
+dmScreenSettings.dmPelsHeight   = height;           // Selected Screen Height
+dmScreenSettings.dmBitsPerPel   = bits;             // Selected Bits Per Pixel
+dmScreenSettings.dmFields=DM_BITSPERPEL|DM_PELSWIDTH|DM_PELSHEIGHT;
+	*/
+trace_OUT("");
+}
+Window::Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _name, DWORD _flags)
 	: 
-	Window(_width,_height,_name,_flags)
+	Window(_width, _height, _name, _flags)
 {
 	Parent = _parent;
 }
 
+void Window::ResizeWindow(uint32_t width, uint32_t height)             // Resize And Initialize The GL Window
+{
+	if (height == 0)                              // Prevent A Divide By Zero By
+	{
+		height = 1;                           // Making Height Equal One
+	}
+
+	glViewport(0, 0, width, height);                    // Reset The Current Viewport
+	glMatrixMode(GL_PROJECTION);
+	glMatrixMode(GL_PROJECTION);                        // Select The Projection Matrix
+	glLoadIdentity();                           // Reset The Projection Matrix
+
+	// Calculate The Aspect Ratio Of The Window
+	gluPerspective(45.0f, (GLfloat)width / (GLfloat)height, 0.1f, 100.0f);
+
+	glMatrixMode(GL_MODELVIEW);                     // Select The Modelview Matrix
+	glLoadIdentity();                           // Reset The Modelview Matrix
+}
 
 
+///==================================================================================================================
+///====================== EVENT SYSTEM ==============================================================================
+///==================================================================================================================
 
 
- 
 EventSystem::EventSystem()
 {
 }
@@ -85,6 +246,7 @@ EventSystem & EventSystem::Instance()
 	static EventSystem instance;
 	return instance;
 }
+
 void EventSystem::PostMSG(Event msg)
 {
 	Messages.push(msg);
@@ -98,7 +260,6 @@ void EventSystem::RemoveListener(MsgType msg, Listener &handler)
 	ListenerMap[msg].erase(std::find(ListenerMap[msg].begin(), ListenerMap[msg].end(), &handler));
 }
 
-
 void EventSystem::Dispatch(Event msg)
 {
 	for (auto& Callback : ListenerMap[msg.message])
@@ -106,14 +267,13 @@ void EventSystem::Dispatch(Event msg)
 		Callback->Handler(msg);
 	}
 }
-bool EventSystem::PeekMSG(Event & msg, unsigned int rangemin, unsigned int rangemax, int handlingflags)
+bool EventSystem::PeekMSG(Event & msg, unsigned int _rangemin, unsigned int _rangemax, int handlingflags)
 {
 	handlingflags = 0;/// TEMP TO JUST TEST IT
-
 	if (Messages.size())
 	{
 		msg = Event(Messages.front());
-		if (msg.message > rangemin && msg.message < rangemax)
+		if (msg.message > _rangemin && msg.message < _rangemax)
 		{
 			switch (handlingflags)
 			{
@@ -141,45 +301,19 @@ bool EventSystem::PeekMSG(Event & msg, unsigned int rangemin, unsigned int range
 }
 void EventSystem::PollEvents()
 {
-	///InputManager::PollNativeEvents();
+	LPMSG Msg{ 0 };
+	while ( PeekMessageA( Msg, Application::ActiveWindow().g_Handle(), 0, 0xFFFFFFFF	,PM_REMOVE))// TODO _handleFlags
+	{
+		Messages.push(*Msg);
+	}
 }
 
 
+///==================================================================================================================
+///========================= APPLICATION  CLASS =====================================================================
+///==================================================================================================================
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*=====================================================================================================
-_________________________________ APPLICATION CLASS ___________________________________________________
-=======================================================================================================
-  Application class Abstracts away functionality of the application itself. It handles some important
-  Messages such as Keyboard or Mouse Events. The User can define a handler for all Keyboard or Mouse
-  Events however if they chose not to they can instead define specific Key or Mouse events such as
-  a Handler for only the Left Mouse click or one for Only the Key Repeat.
-  If the User does not define a specific Generic handler one has been supplied which calls the
-  appropritate sub functionality for the input device
-=========================================================================================================
-USAGE:
-=========================================================================================================
-*/
-
-
-#include<string>
 Application::Application()
 {
 	trace_IN("Application Created:");
@@ -189,32 +323,13 @@ Application::~Application()
 	trace_IN("Application Deleted:");
 }
 
-//=======================================================================================================
-//_______________________________ STATE and FLOW HANDLING _______________________________________________
-//=======================================================================================================
+//=============================================================================================
+
+//_______________________________ STATE and FLOW HANDLING _____________________________________
 
 void Application::Start()
 {
-	///CreateMysticWindow();
-	//TODO: Setup a Window Creation function
-
-	//--------Gathering information about OpenGL state and Display it -----------------------------------------------
-	//  int NumberOfExtensions = 0;
-	//  _GL(glGetIntegerv(GL_NUM_EXTENSIONS, &NumberOfExtensions));
-	//  
-	//  for (int i = 0; i < NumberOfExtensions; i++) {
-	//  	const GLubyte *ccc = glGetStringi(GL_EXTENSIONS, i);
-	//  	Print(ccc);
-	//  }
-
-	//const GLubyte *extensions = glGetString(GL_EXTENSIONS);
-	//Print(extensions);
-	//Print("");
-	//Print("OpenGL Version: " << glGetString(GL_VERSION));
-	//Print("Renderer: " << glGetString(GL_RENDERER));
-	//Print("Current Context: "; Print(glGetCurrentContext()));
-
-	//-------------------------------------------------------------------------------------------------------------
+	CreateApplicationWindow();
 	OnCreate();
 }
 
@@ -226,12 +341,18 @@ void Application::End()
 void Application::Run()
 {
 	Event msg;
-	while (ApplicationWindow->isAlive())
+	while (Running) //ApplicationWindow->isAlive())
 	{
 
 		EventSystem::Instance().PollEvents();
 		while (EventSystem::Instance().PeekMSG(msg, 0, 0xFFFFFFFF, REMOVE_MESSAGE))
 		{
+			if (msg.message _EQUALS_ WM_QUIT)               // Have We Received A Quit Message?
+			{// TODO: This is just for now. To Avoid a branch here remove this, have the Window fire the Killing of the Application if message is recieved. 
+				Running = false;                  // If So done=TRUE
+			}
+			TranslateMessage(&msg); 
+			DispatchMessage(&msg);
 			EventSystem::Instance().Dispatch(msg); // Line 37 Eventsystem.cpp
 		}
 		Update();
@@ -266,11 +387,10 @@ void Application::OnRun()    { trace_IN(" Default "); }
 void Application::OnUpdate() { trace_IN(" Default "); }
 void Application::OnRender() { trace_IN(" Default "); }
 
+//=============================================================================================
 
+//________________________________ WINDOW CREATION PROPERTIES _________________________________
 
-//=================================================================================================
-//________________________________ WINDOW CREATION PROPERTIES _____________________________________
-//=================================================================================================
 void Application::SetWindowProperties()
 {
 	trace_IN("DEFAULT: THIS SHOULD GO LIKELY");
@@ -285,149 +405,8 @@ void Application::CreateApplicationWindow()
 		Print(" Define the virtual function with the specifications for your applications Window before calling CreateWindow() ");
 		__debugbreak();
 	}
-	ApplicationWindow = new Window(640,480, std::string("THIS IS DEFAULT WINDOW: DONT FORGET TO FIX THIS SHIT"), (WindowFlags)0);
+	ApplicationWindow = new Window(640,480, std::string("THIS IS DEFAULT WINDOW: DONT FORGET TO FIX THIS SHIT"), 0);
+	s_WindowFocus(*ApplicationWindow);
 }
 void Application::SetHints()
-
-{// Sets the Properties defined in the Hint Structure for the Application
-}
-	/*
-	DEBUG_TRACE("I Do not Like this, Not one single bit, I want this Hint structure to be in the Window Class however I want to be able to assign properties using the SetWindowProperties. There is a problem because I have to Initialize GLFW before and that is in the Window Struct. I will likely Initialize GLFW in the System Manager or something.")
-		glfwWindowHint(GLFW_RESIZABLE, Hints.WindowStyle.RESIZABLE);
-	glfwWindowHint(GLFW_VISIBLE, Hints.WindowStyle.VISIBLE);
-	glfwWindowHint(GLFW_DECORATED, Hints.WindowStyle.DECORATED);
-	// For VR type stuff
-	glfwWindowHint(GLFW_STEREO, Hints.Random.STEREO);
-	glfwWindowHint(GLFW_SRGB_CAPABLE, Hints.Random.SRGB_CAPABLE);
-	// --------- Following Create the Default Framebuffer for the Window being created --------
-	// Color Bits
-	glfwWindowHint(GLFW_RED_BITS, Hints.FrameBuffer.RED_BITS);
-	glfwWindowHint(GLFW_GREEN_BITS, Hints.FrameBuffer.GREEN_BITS);
-	glfwWindowHint(GLFW_BLUE_BITS, Hints.FrameBuffer.BLUE_BITS);
-	glfwWindowHint(GLFW_ALPHA_BITS, Hints.FrameBuffer.ALPHA_BITS);
-	// Depth and Stencil Buffer bits
-	glfwWindowHint(GLFW_DEPTH_BITS, Hints.FrameBuffer.DEPTH_BITS);
-	glfwWindowHint(GLFW_STENCIL_BITS, Hints.FrameBuffer.STENCIL_BITS);
-	// Accumulation Bits
-	glfwWindowHint(GLFW_ACCUM_RED_BITS, Hints.FrameBuffer.ACCUM_RED_BITS);
-	glfwWindowHint(GLFW_ACCUM_GREEN_BITS, Hints.FrameBuffer.ACCUM_GREEN_BITS);
-	glfwWindowHint(GLFW_ACCUM_BLUE_BITS, Hints.FrameBuffer.ACCUM_BLUE_BITS);
-	glfwWindowHint(GLFW_ACCUM_ALPHA_BITS, Hints.FrameBuffer.ACCUM_ALPHA_BITS);
-	//-------------------------------------------------------------------------------------------
-	glfwWindowHint(GLFW_AUX_BUFFERS, Hints.FrameBuffer.AUX_BUFFERS);
-	// Anti Aliasing Sampling rates
-	glfwWindowHint(GLFW_SAMPLES, Hints.FrameBuffer.SAMPLES);
-	glfwWindowHint(GLFW_REFRESH_RATE, Hints.FrameBuffer.REFRESH_RATE);
-	// OpenGL Context Creation
-	glfwWindowHint(GLFW_CLIENT_API, Hints.Context.CLIENT_API);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, Hints.Context.CONTEXT_VERSION_MAJOR);
-	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, Hints.Context.CONTEXT_VERSION_MINOR);
-	glfwWindowHint(GLFW_CONTEXT_ROBUSTNESS, Hints.Context.CONTEXT_ROBUSTNESS);
-	//glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, Hints.Context.FORWARD_COMPAT);
-	//glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, Hints.Context.OPENGL_DEBUG_CONTEXT);
-	glfwWindowHint(GLFW_OPENGL_PROFILE, Hints.Context.OPENGL_PROFILE);
-}
-void Application::SetStereo(bool param)
-{
-	Hints.Random.STEREO = param;
-}
-void Application::sRGBCapable(bool param)
-{
-	Hints.Random.SRGB_CAPABLE = param;
-}
-void Application::ForwardCompatible(bool param)
-{
-	Hints.Random.OPENGL_FORWARD_COMPAT = param;
-}
-void Application::DebugContext(bool param)
-{
-	Hints.Random.OPENGL_DEBUG_CONTEXT = param;
-}
-void Application::ResizableWindow(bool param)
-{
-	Hints.WindowStyle.RESIZABLE = param;
-}
-void Application::VisibleWindow(bool param)
-{
-	Hints.WindowStyle.VISIBLE = param;
-}
-void Application::DecoratedWindow(bool param)
-{
-	Hints.WindowStyle.DECORATED = param;
-}
-void Application::SetRedBits(unsigned int param)
-{
-	Hints.FrameBuffer.RED_BITS = param;
-}
-void Application::SetGreenBits(unsigned int param)
-{
-	Hints.FrameBuffer.GREEN_BITS = param;
-}
-void Application::SetBlueBits(unsigned int param)
-{
-	Hints.FrameBuffer.BLUE_BITS = param;
-}
-void Application::SetAlphaBits(unsigned int param)
-{
-	Hints.FrameBuffer.ALPHA_BITS = param;
-}
-void Application::SetDepthBits(unsigned int param)
-{
-	Hints.FrameBuffer.DEPTH_BITS = param;
-}
-void Application::SetStencilBits(unsigned int param)
-{
-	Hints.FrameBuffer.STENCIL_BITS = param;
-}
-void Application::SetAccumulatorRedBits(unsigned int param)
-{
-	Hints.FrameBuffer.ACCUM_RED_BITS = param;
-}
-void Application::SetAccumulatorGreenBits(unsigned int param)
-{
-	Hints.FrameBuffer.ACCUM_GREEN_BITS = param;
-}
-void Application::SetAccumulatorBlueBits(unsigned int param)
-{
-	Hints.FrameBuffer.ACCUM_BLUE_BITS = param;
-}
-void Application::SetAccumulatorAlphaBits(unsigned int param)
-{
-	Hints.FrameBuffer.ACCUM_ALPHA_BITS = param;
-}
-void Application::SetAuxiliaryBits(unsigned int param)
-{
-	Hints.FrameBuffer.AUX_BUFFERS = param;
-}
-void Application::SetNumberOfSamples(unsigned int param)
-{
-	Hints.FrameBuffer.SAMPLES = param;
-}
-void Application::SetRefreshRate(unsigned int param)
-{
-	Hints.FrameBuffer.REFRESH_RATE = param;
-}
-void Application::UseOpenGLClient(unsigned int param)
-{
-	Hints.Context.CLIENT_API = param;
-}
-void Application::UseOpenGLESClient(unsigned int param)
-{
-	Hints.Context.CONTEXT_VERSION_MAJOR = param;
-}
-void Application::SetMajorVersion(unsigned int param)
-{
-	Hints.Context.CONTEXT_VERSION_MINOR = param;
-}
-void Application::SetMinorVersion(unsigned int param)
-{
-	Hints.Context.CONTEXT_ROBUSTNESS = param;
-}
-void Application::UseOpenGLProfile(unsigned int param)
-{
-	Hints.Context.OPENGL_PROFILE = param;
-}
-
-
-
-*/
+{}

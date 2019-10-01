@@ -32,9 +32,7 @@
 class TestApp
 	:
 	public Application
-{
-
-};
+{};
 
 int main()
 {

@@ -34,17 +34,19 @@ private:
 ///========================= PUBLISHER SUBSCRIBER SYSTEM ==========================================================
 ///================================================================================================================
 
+#define NULL_COPY_AND_ASSIGNMENT(_ClassName)  _ClassName(_ClassName const&) = delete; void operator = (_ClassName const&) = delete;  // and prevents Copies from being made
+
 
 class EventSystem
 {// Singleton design pattern
-	EventSystem();
-public:
-	static EventSystem &Instance();           // Initializes EventSystem when called first time
-	EventSystem(EventSystem const&) = delete; // and prevents Copies from being made
-	void operator = (EventSystem const&) = delete;
+	EventSystem();	
+	NULL_COPY_AND_ASSIGNMENT(EventSystem);
 
+public: 
+	/*  Initializes EventSystem and returns Reference to Only EventSystem instance */
+	static EventSystem &get();     
+  
 public:
-	void PollEvents();
 	void PostMSG(Event msg);
 	bool PeekMSG(Event&msg, unsigned int rangemin, unsigned int rangemax, int handlingflags);
 	void Dispatch(Event msg);

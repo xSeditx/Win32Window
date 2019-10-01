@@ -8,6 +8,7 @@
 #include<stack>
 #include<queue>
 
+#include"Glad.h"
 
 /*
 
@@ -303,7 +304,7 @@ private:
 
 	WNDCLASS    WindowProperties = { 0 };
 	PIXELFORMATDESCRIPTOR PixelFormatDescriptor{ 0 };
-	int         PixelFormat{ 0 };
+	int PixelFormat{ 0 };
 	std::string Title{ "" };
 };
 

@@ -9,9 +9,8 @@ _static Window * Application::FocusedWindow;
 
 Application::Application()
 	:
-	MessageHandler(EventSystem::Instance())
+	MessageHandler(EventSystem::get())
 {
-
 	trace_IN("Application Created:");
 }
 Application::~Application()
@@ -37,11 +36,9 @@ void Application::End()
 void Application::Run()
 {
 	Event msg;
-	while (Running) //ApplicationWindow->isAlive())
+	while (Running)
 	{
-
-		EventSystem::Instance().PollEvents();
-		while (EventSystem::Instance().PeekMSG(msg, 0, 0xFFFFFFFF, REMOVE_MESSAGE))
+		while (EventSystem::get().PeekMSG(msg, 0, 0xFFFFFFFF, REMOVE_MESSAGE))
 		{
 			if (msg.message _EQUALS_ WM_QUIT)               // Have We Received A Quit Message?
 			{// TODO: This is just for now. To Avoid a branch here remove this, have the Window fire the Killing of the Application if message is recieved. 
@@ -49,11 +46,11 @@ void Application::Run()
 			}
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
-			EventSystem::Instance().Dispatch(msg); // Line 37 Eventsystem.cpp
+			EventSystem::get().Dispatch(msg); // Line 37 Eventsystem.cpp
 		}
 		Update();
+		UpdateWindow(ApplicationWindow->g_Handle());
 		Render();
-
 	}
 	End();
 }

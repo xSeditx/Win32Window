@@ -30,7 +30,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			Print("Inactive");                    // Program Is No Longer Active
 		}
 
-		return 0;                       // Return To The Message Loop
+		break;                       // Return To The Message Loop
 	}
 
 	case WM_SYSCOMMAND:                     // Intercept System Commands
@@ -47,31 +47,108 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	case WM_CLOSE:                          // Did We Receive A Close Message?
 	{
 		PostQuitMessage(0);                 // Send A Quit Message
-		return 0;                       // Jump Back
+		break;    // Jump Back
 	}
 
 	case WM_KEYDOWN:                        // Is A Key Being Held Down?
 	{
 		Input::Keyboard.Keys[wParam] = TRUE;                    // If So, Mark It As TRUE
-		return 0;                       // Jump Back
+		break;                      // Jump Back
 	}
 
 	case WM_KEYUP:                        // Is A Key Being Held Down?
 	{
 		Input::Keyboard.Keys[wParam] = TRUE;                    // If So, Mark It As TRUE
-		return 0;                       // Jump Back
+		break;                      // Jump Back
 	}
-
 
 	case WM_SIZE:                           // Resize The OpenGL Window
 	{
 		Print("Resize the window here");
 		//ReSizeGLScene(LOWORD(lParam), HIWORD(lParam));       // LoWord=Width, HiWord=Height
-		return 0;                       // Jump Back
-	}
+		break;                       // Jump Back
 	}
 
-	return DefWindowProc(hwnd, uMsg, wParam, lParam);
+	case WM_NCMOUSEMOVE:
+	{
+		Print("MouseMove");
+	}
+
+	case WM_NCLBUTTONDOWN:
+	{
+		Print("MouseDown");
+		break;
+	}
+
+	case WM_LBUTTONUP:
+	{
+		Print("Left Button Up");
+		break;
+	}
+
+	case WM_LBUTTONDBLCLK:
+	{
+		Print("L DClick ");
+		break;
+	}
+
+	case WM_RBUTTONDOWN:
+	{	
+		Print(" RButtonDown");
+		break;
+	}
+
+	case WM_RBUTTONUP:
+	{
+		Print(" RButUP");
+		break;
+	}
+
+	case WM_RBUTTONDBLCLK:
+	{
+		Print(" R Button DClick");
+		break;
+	}
+
+	case WM_MBUTTONDOWN:
+	{
+		Print(" MButtonDown");
+		break;
+	}
+
+	case WM_MBUTTONUP:
+	{
+		Print("M BUtton UP ");
+		break;
+	}
+
+	case WM_MBUTTONDBLCLK:
+	{
+		Print(" MButton DClick");
+		break;
+	}
+
+	case WM_XBUTTONDOWN:
+	{
+		Print(" XButtonDown");
+		break;
+	}
+
+	case WM_XBUTTONUP:
+	{
+		Print(" X Up");
+		break;
+	}
+
+	case WM_XBUTTONDBLCLK:
+	{
+		Print(" X DClick");
+		break;
+	}
+
+	default:
+		return DefWindowProc(hwnd, uMsg, wParam, lParam);
+	}
 }
 
 Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flags)
@@ -81,8 +158,9 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 	Title(_name)
 {
 	trace_IN("");
- 
+ //http://www.rastertek.com/gl40tut03.html
 	const char* title = { "Test Window" };
+
 
  	if (!Application::Instance)
 	{// TODO: Just do this  in the Application class as that should be responsible for registering its various Class styles
@@ -126,7 +204,9 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 	DeviceContext = GetDC(Handle);
 
 	/* there is no guarantee that the contents of the stack that become
-	   the pfd are zeroed, therefore _make sure_ to clear these bits. */
+	   the pfd are zeroed, therefore _make sure_ to clear these bits. 
+	NOTE:  A good pixel format to choose for the dummy context is a simple 32-bit RGBA color buffer, with a 24-bit depth buffer and 8-bit stencil, as we did in the above sample PFD. This will usually get a hardware accelerated pixel format.   
+	   */
 	memset(&PixelFormatDescriptor, 0, sizeof(PixelFormatDescriptor));
 	PixelFormatDescriptor.nSize = sizeof(PixelFormatDescriptor);
 	PixelFormatDescriptor.nVersion = 1;
@@ -174,21 +254,38 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 		sizeof(PIXELFORMATDESCRIPTOR),
 		&PixelFormatDescriptor
 	);
-
-	ReleaseDC(Handle, DeviceContext);
-	ShowWindow(Handle, SW_SHOW);
-
-	glShadeModel(GL_SMOOTH);
-	glClearColor(0.0f, 0.0f, 1.0f, 0.0f);                   // Black Background
-	glClearDepth(1.0f);                         // Depth Buffer Setup
-	glEnable(GL_DEPTH_TEST);                        // Enables Depth Testing
-	glDepthFunc(GL_LEQUAL);                         // The Type Of Depth Test To Do
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);          // Really Nice Perspective Calculations
-	/// DEPRECATED I THINK 
-
 	SetForegroundWindow(Handle);                      // Slightly Higher Priority
 	SetFocus(Handle);
-													  
+	//ReleaseDC(Handle, DeviceContext);
+	ShowWindow(Handle, SW_SHOW);
+	int  letWindowsChooseThisPixelFormat;
+	letWindowsChooseThisPixelFormat = ChoosePixelFormat(DeviceContext, &PixelFormatDescriptor);
+	SetPixelFormat(DeviceContext, letWindowsChooseThisPixelFormat, &PixelFormatDescriptor);
+
+	HGLRC ourOpenGLRenderingContext = wglCreateContext(DeviceContext);
+	wglMakeCurrent(DeviceContext, ourOpenGLRenderingContext);
+	
+	//MessageBoxA(0, (char*)glGetString(GL_VERSION), "OPENGL VERSION", 0);
+
+
+
+
+	//load_GL_VERSION_4_6(wglGetProcAddress);
+	gladLoadGLLoader((GLADloadproc)wglGetProcAddress);
+	//if (!gladLoadGL())
+	//{
+	////	int error_code = glad_glGetError();
+	////	std::cout << "Failed to initialize GLAD" << error_code << std::endl;
+	////	__debugbreak();
+	//	//return -1;
+	//}
+	//glShadeModel(GL_SMOOTH);
+	//glClearColor(0.0f, 0.0f, 1.0f, 0.0f);                   // Black Background
+	//glClearDepth(1.0f);                         // Depth Buffer Setup
+	//glEnable(GL_DEPTH_TEST);                        // Enables Depth Testing
+	//glDepthFunc(GL_LEQUAL);                         // The Type Of Depth Test To Do
+	//glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);          // Really Nice Perspective Calculations
+	/// DEPRECATED I THINK 
 													  
 													  /*
 	FULL SCREEN MODE 

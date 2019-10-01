@@ -2,6 +2,7 @@
 
 #include<unordered_map>
 #include<Windows.h>
+#include<Windowsx.h>
 #include<iostream>
 #include<cstdint>    /* Type defines */
 #include<string>
@@ -113,11 +114,54 @@ struct vec2_point
 	vec2_point<_Ty> operator -(vec2_point<_Ty> _other) { return vec2_point<_Ty>(this->x - _other.x, this->y - _other.y); }
 	vec2_point<_Ty> operator *(vec2_point<_Ty> _other) { return vec2_point<_Ty>(this->x * _other.x, this->y * _other.y); }
 	vec2_point<_Ty> operator /(vec2_point<_Ty> _other) { return vec2_point<_Ty>(this->x / _other.x, this->y / _other.y); }
+	
+	// Operator Definitions
+	vec2_point<_Ty> & operator +=(const vec2_point<_Ty> & _other) { return add(_other); }
+	vec2_point<_Ty> & operator -=(const vec2_point<_Ty> & _other) { return subtract(_other); }
+	vec2_point<_Ty> & operator *=(const vec2_point<_Ty> & _other) { return multiply(_other); }
+	vec2_point<_Ty> & operator /=(const vec2_point<_Ty> & _other) { return divide(_other); }
+
+	// Operating on Two Vectors 
+	vec2_point<_Ty>& add(const vec2_point<_Ty>& other) {
+		x += other.x; y += other.y;
+		return *this;
+	}
+	vec2_point<_Ty>& subtract(const vec2_point<_Ty>& other) {
+		x -= other.x; y -= other.y;
+		return *this;
+	}
+	vec2_point<_Ty>& divide(const vec2_point<_Ty>& other) {
+		x /= other.x; y /= other.y;
+		return *this;
+	}
+	vec2_point<_Ty>& multiply(const vec2_point<_Ty>& other) {
+		x *= other.x; y *= other.y;
+		return *this;
+	}
+
+	// Operating on a Vector and a Single other Value
+	vec2_point<_Ty> & add(_Ty other) {
+		x += other; y += other;
+		return *this;
+	}
+	vec2_point<_Ty> & subtract(_Ty other) {
+		x -= other; y -= other;
+		return *this;
+	}
+	vec2_point<_Ty> & divide(_Ty other) {
+		x /= other; y /= other;
+		return *this;
+	}
+	vec2_point<_Ty> & multiply(_Ty other) {
+		x *= other; y *= other;
+		return *this;
+	}
 };
 typedef vec2_point<float>  Vec2;
 typedef vec2_point<int>   iVec2;
 #endif
 #ifdef _REFLECTION /// Soon to be basic Reflection system. 
+// Reflection for C++ https://www.youtube.com/watch?v=Ovt6IWD5L08
 template<typename _Ty, bool HasMyType>
 struct _get_meta
 {
@@ -211,8 +255,15 @@ struct Input
 {
 	struct _mouse
 	{
+		
+		// We are going to likely want to access this a number of ways
+			Vec2 Position{ 0,0 };
+		
+		// We are going to likely want to access this a number of ways
+			Vec2 Relative{ 0,0 };
+
 		struct
-		{
+		{//TODO: Union to Access Buttons as Array might be useful as well
 			bool Left, Right, Center, X1, X2;
 		}Buttons;
 	}static Mouse;
@@ -275,7 +326,7 @@ public:
 
 	/* Display the contents of the back buffer to the Screen (*note:future at VSync if Specified) */
 	void Sync() { SwapBuffers(DeviceContext); }
-
+ 
 	/* Clear the Contents of the BackBuffer */
 	void CLS()	{ glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  }       // Clear The Screen And The Depth Buffer
 
@@ -292,9 +343,7 @@ public:
 	void ResizeWindow(uint32_t _x, uint32_t _y);
 private:
 
-	bool Active  = true;
-	bool Alive   = true;
-	bool Visible = true;
+	HGLRC GL_Context{ 0 };
 
 	Window *Parent = nullptr;
 	HWND Handle{ 0 };
@@ -306,10 +355,26 @@ private:
 	PIXELFORMATDESCRIPTOR PixelFormatDescriptor{ 0 };
 	int PixelFormat{ 0 };
 	std::string Title{ "" };
+
+	bool Active  = true;
+	bool Alive   = true;
+	bool Visible = true;
+
 };
 
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 
+/*
+
+
+[Signaler]->changeData->  |-> observeData->[Waiter]
+        ->Wake Waiters->  |<- enter waitqueue <-|
+
+
+
+
+*/
 
 ///                                                                                                   |||
 ///       Universal scenes and universal objects are responsible for registering all their extensions |||

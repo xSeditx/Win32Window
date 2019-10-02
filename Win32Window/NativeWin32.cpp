@@ -9,6 +9,17 @@ std::ostream& operator <<(std::ostream& os, ErrorMessage& _msg)
 	return os;
 }
 
+
+std::ostream& operator<<(std::ostream& stream, const Vec2& vector)
+{
+	stream << "X:[" << vector.x << "] - Y:[" << vector.y << "]";
+	return stream;
+}
+
+
+
+
+
 ///==================================================================================================================
 ///====================== WINDOW SYSTEM  ============================================================================
 ///==================================================================================================================
@@ -121,8 +132,24 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 
 	/// Create OpenGL Rendering Context
 	{// OpenGL Rendering Context Scope
+
+
+
+
+		//  wglCreateContext	    Creates a new rendering context.
+		//  WglMakeCurrent	        Sets a thread's current rendering context.
+		//  WglGetCurrentContext	Obtains a handle to a thread's current rendering context.
+		//  WglGetCurrentDC      	Obtains a handle to the device context associated with a thread's current rendering context.
+		//  WglDeleteContext	    Deletes a rendering context.
+
+
+
+
+
 		GL_Context = wglCreateContext(DeviceContext);
-		wglMakeCurrent(DeviceContext, GL_Context);
+		if (!wglMakeCurrent(DeviceContext, GL_Context))
+		{
+			Print("Making Current Rendering Context Failed");		}
 		if (!GL_Context)
 		{
 			MessageBox
@@ -143,6 +170,15 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 		};
 
 		//	MessageBoxA(0, (char*)glGetString(GL_VERSION), "OPENGL VERSION", 0);
+
+
+
+		//  wglCreateContext	    Creates a new rendering context.
+		//  WglMakeCurrent	        Sets a thread's current rendering context.
+		//  WglGetCurrentContext	Obtains a handle to a thread's current rendering context.
+		//  WglGetCurrentDC      	Obtains a handle to the device context associated with a thread's current rendering context.
+		//  WglDeleteContext	    Deletes a rendering context.
+
 	}
 
 	/// Set Window State
@@ -161,6 +197,7 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 		glEnable(GL_DEPTH_TEST);                        // Enables Depth Testing
 		glDepthFunc(GL_LEQUAL);                         // The Type Of Depth Test To Do
 		glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);          // Really Nice Perspective Calculations
+		glViewport(0, 0, _width, _height);
 	}
 
 	/// Set FullScreen Mode : Define _FULL_SCREEN_MODE to activate
@@ -186,6 +223,19 @@ Window::Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _
 {
 	Parent = _parent;
 }
+/* Display the contents of the back buffer to the Screen (*note:future at VSync if Specified) */
+void Window::Sync()
+{	
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	SwapBuffers(DeviceContext); 
+
+}
+
+/* Clear the Contents of the BackBuffer */
+void Window::CLS()
+{   
+}       // Clear The Screen And The Depth Buffer
+
 
 void Window::ResizeWindow(uint32_t _width, uint32_t _height)             // Resize And Initialize The GL Window
 {/// NOTE :https://stackoverflow.com/questions/692742/how-do-you-programmatically-resize-and-move-windows-with-the-windows-api

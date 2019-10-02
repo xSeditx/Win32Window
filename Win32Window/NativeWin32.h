@@ -63,7 +63,6 @@ _________________________________________________________
 #pragma comment(lib, "gdiplus.lib")
 
 
-
 ///================================================================================================================
 ///====================== VARIOUS HELPERS =========================================================================
 ///================================================================================================================
@@ -156,9 +155,89 @@ struct vec2_point
 		x *= other; y *= other;
 		return *this;
 	}
+
+
+	// Arithmatic
+	_Ty Dot(vec2_point<_Ty> A)
+	{
+		return A.x * this.x + A.y * this.y;
+	}
+
+	_Ty Cross(vec2_point<_Ty> A)
+	{
+		return A.x * this.y - A.y * this.x;
+	}
+
+	_Ty g_Angle(vec2_point<_Ty> A)
+	{
+		// HACK Idk just fix this shit later
+		return atan2f(this.y - A.y, this.x - A.x) / 3.14159 * 180;
+	}
+
+	vec2_point<_Ty> g_Displacement(vec2_point<_Ty> A) {
+		return { A.x - this.x,  A.y - this.y };
+	}
+
+
+	static vec2_point<_Ty> g_Displacement(vec2_point<_Ty> A, vec2_point<_Ty> B) {
+		return {A.x - B.x,  A.y - B.y};
+	}
+
+	static double Dot(vec2_point<_Ty> A, vec2_point<_Ty> B)
+	{
+		return A.x * B.x + A.y * B.y;
+	}
+
+	static double Cross(vec2_point<_Ty> A, vec2_point<_Ty> B)
+	{
+		return A.x*B.y - A.y*B.x;
+	}
+
+	static double g_Angle(vec2_point<_Ty> A, vec2_point<_Ty> B)
+	{
+		return atan2f(B.y - A.y, B.x - A.x) / 3.14159 * 180;
+	}
+
+	// Comparison Operators
+	bool operator ==(const vec2_point<_Ty>& other)
+	{
+		return x == other.x && y == other.y; 
+	}
+	bool operator !=(const vec2_point<_Ty>& other)
+	{
+		return !(*this == other); 
+	}
 };
-typedef vec2_point<float>  Vec2;
-typedef vec2_point<int>   iVec2;
+
+typedef vec2_point<float>   Vec2;
+typedef vec2_point<int>    iVec2;
+typedef vec2_point<double> dVec2;
+
+std::ostream& operator<<(std::ostream& stream, const Vec2& vector);
+
+//__________________________________________________________________________________________________________________________________
+
+
+
+
+
+
+inline double Squared(double x) {
+	return x * x;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 #endif
 #ifdef _REFLECTION /// Soon to be basic Reflection system. 
 // Reflection for C++ https://www.youtube.com/watch?v=Ovt6IWD5L08
@@ -325,10 +404,10 @@ public:
 	bool isActive() const  { return Active; }
 
 	/* Display the contents of the back buffer to the Screen (*note:future at VSync if Specified) */
-	void Sync() { SwapBuffers(DeviceContext); }
- 
+	void Sync();
+
 	/* Clear the Contents of the BackBuffer */
-	void CLS()	{ glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  }       // Clear The Screen And The Depth Buffer
+	void CLS();      // Clear The Screen And The Depth Buffer
 
 	/* Returns the Native Windows Handle (HWND) of the Window */
 	const HWND g_Handle() const { return Handle; }
@@ -341,6 +420,8 @@ public:
 
 	/* Changes with Window size and OpenGL Viewport settings */
 	void ResizeWindow(uint32_t _x, uint32_t _y);
+
+	HDC g_DeviceContext() { return DeviceContext; }
 private:
 
 	HGLRC GL_Context{ 0 };

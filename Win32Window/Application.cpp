@@ -48,9 +48,19 @@ void Application::Run()
 			DispatchMessage(&msg);
 			EventSystem::get().Dispatch(msg); // Line 37 Eventsystem.cpp
 		}
-		Update();
-		UpdateWindow(ApplicationWindow->g_Handle());
+
+		//SwapBuffers(ApplicationWindow->g_DeviceContext());
+		//glFlush();		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			Update();
+	//	UpdateWindow(ApplicationWindow->g_Handle());
 		Render();
+		glFlush();
+
+		if (glGetError())
+		{
+			Print("Error");
+		}
 	}
 	End();
 }

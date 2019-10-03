@@ -219,9 +219,6 @@ std::ostream& operator<<(std::ostream& stream, const Vec2& vector);
 
 
 
-
-
-
 inline double Squared(double x) {
 	return x * x;
 }
@@ -229,16 +226,8 @@ inline double Squared(double x) {
 
 
 
-
-
-
-
-
-
-
-
-
 #endif
+
 #ifdef _REFLECTION /// Soon to be basic Reflection system. 
 // Reflection for C++ https://www.youtube.com/watch?v=Ovt6IWD5L08
 template<typename _Ty, bool HasMyType>
@@ -422,6 +411,8 @@ public:
 	void ResizeWindow(uint32_t _x, uint32_t _y);
 
 	HDC g_DeviceContext() { return DeviceContext; }
+	GLuint BasicShader;
+
 private:
 
 	HGLRC GL_Context{ 0 };
@@ -441,9 +432,60 @@ private:
 	bool Alive   = true;
 	bool Visible = true;
 
+
+
+    void CreateDefaultShader();
+
+    std::string BasicVertexShader = "\
+#version 330 \n\
+layout(location = 0) in vec3 VertexPosition;\n\
+out vec3 VertexColor;\n\
+out vec4 FragPosition;\n\
+void main()\n\
+{\n\
+FragPosition = vec4(VertexPosition.xyz, 1.0f);\n\
+VertexColor = vec3(1.0,1.0,1.0);\n\
+}";
+	
+	std::string BasicFragmentShader = "\n\
+#version 330            \n\
+out vec3 color;         \n\
+in vec3 VertexColor;    \n\
+in vec4 FragPosition; \n\
+void main(){            \n\
+color = vec3(1, 0, 0);  \n\
+}";
+
+	std::string VertexShader = " #version 330 core \n\
+layout(location = 0) in vec3 aPos; 			\n\
+out vec4 vertexColor; 						\n\
+void main()									\n\
+{											\n\
+	gl_Position = vec4(aPos, 1.0);			\n\
+	vertexColor = vec4(0.5, 0.0, 0.0, 1.0); \n\
+}";
+
+
+
+	std::string FragmentShader = "#version 330 core \n\
+out vec4 FragColor;									 \n\
+in vec4 vertexColor;  								 \n\
+void main()											 \n\
+{													 \n\
+	FragColor = vertexColor;						 \n\
+}";
+
+
+
 };
 
+
+
+
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+
 
 
 /*

@@ -55,12 +55,14 @@ void Application::Run()
 			Update();
 	//	UpdateWindow(ApplicationWindow->g_Handle());
 		Render();
-		glFlush();
-
-		if (glGetError())
+		//glFlush();
+		uint32_t ERR = 0;
+		if (( ERR = glGetError()))
 		{
-			Print("Error");
+			Print("Error" << ERR);
+			__debugbreak();
 		}
+
 	}
 	End();
 }

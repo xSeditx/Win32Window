@@ -57,6 +57,8 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 					"Cannot register window class.", "Error", MB_OK);
 				__debugbreak();
 			}
+
+			
 		}
 
 		if (!(Handle = CreateWindow
@@ -84,7 +86,7 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 		memset(&PixelFormatDescriptor, 0, sizeof(PixelFormatDescriptor));
 		PixelFormatDescriptor.nSize = sizeof(PixelFormatDescriptor);
 		PixelFormatDescriptor.nVersion = 1;
-		PixelFormatDescriptor.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | _flags;
+		PixelFormatDescriptor.dwFlags = PFD_DOUBLEBUFFER | PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | _flags;
 		PixelFormatDescriptor.iPixelType = PFD_TYPE_RGBA;
 		PixelFormatDescriptor.cColorBits = 32;
 
@@ -171,14 +173,11 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 
 		//	MessageBoxA(0, (char*)glGetString(GL_VERSION), "OPENGL VERSION", 0);
 
-
-
 		//  wglCreateContext	    Creates a new rendering context.
 		//  WglMakeCurrent	        Sets a thread's current rendering context.
 		//  WglGetCurrentContext	Obtains a handle to a thread's current rendering context.
 		//  WglGetCurrentDC      	Obtains a handle to the device context associated with a thread's current rendering context.
 		//  WglDeleteContext	    Deletes a rendering context.
-
 	}
 
 	/// Set Window State
@@ -213,8 +212,7 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 		dmScreenSettings.dmFields=DM_BITSPERPEL|DM_PELSWIDTH|DM_PELSHEIGHT;
 #endif
 	}
-
-
+	CreateDefaultShader();
 trace_OUT("");
 }
 Window::Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _name, DWORD _flags)
@@ -226,9 +224,8 @@ Window::Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _
 /* Display the contents of the back buffer to the Screen (*note:future at VSync if Specified) */
 void Window::Sync()
 {	
+	SwapBuffers(DeviceContext);// 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	SwapBuffers(DeviceContext); 
-
 }
 
 /* Clear the Contents of the BackBuffer */
@@ -423,17 +420,109 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 
 
+void Window::CreateDefaultShader() 
+{
+		// Create the shaders
+	uint32_t ERR = 0;
+	if ((ERR = glGetError()))
+	{
+		Print("Error" << ERR);
+		__debugbreak();
+	}
+
+	GLuint VertexShaderID = glCreateShader(GL_VERTEX_SHADER);
+	GLuint FragmentShaderID = glCreateShader(GL_FRAGMENT_SHADER);
+
+	// Read the Vertex Shader code from the file
+	std::string VertexShaderCode = VertexShader;
+	std::string FragmentShaderCode = FragmentShader;
+	 
+
+	GLint Result = GL_FALSE;
+	int InfoLogLength;
+
+	// Compile Vertex Shader
+	//printf("Compiling shader : %s\n", vertex_file_path);
+	char const * VertexSourcePointer = VertexShaderCode.c_str();
+	glShaderSource(VertexShaderID, 1, &VertexSourcePointer, NULL);
+	glCompileShader(VertexShaderID);
+
+	// Check Vertex Shader
+	glGetShaderiv(VertexShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(VertexShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if (InfoLogLength > 0) {
+		std::vector<char> VertexShaderErrorMessage(InfoLogLength + 1);
+		glGetShaderInfoLog(VertexShaderID, InfoLogLength, NULL, &VertexShaderErrorMessage[0]);
+		printf("%s\n", &VertexShaderErrorMessage[0]);
+	}
+
+	// Compile Fragment Shader
+ 	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
+	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer, NULL);
+	glCompileShader(FragmentShaderID);
+
+	// Check Fragment Shader
+	glGetShaderiv(FragmentShaderID, GL_COMPILE_STATUS, &Result);
+	glGetShaderiv(FragmentShaderID, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if (InfoLogLength > 0) {
+		std::vector<char> FragmentShaderErrorMessage(InfoLogLength + 1);
+		glGetShaderInfoLog(FragmentShaderID, InfoLogLength, NULL, &FragmentShaderErrorMessage[0]);
+		printf("%s\n", &FragmentShaderErrorMessage[0]);
+	}
+
+	// Link the program
+	printf("Linking program\n");
+	BasicShader = glCreateProgram();
+	glAttachShader(BasicShader, VertexShaderID);
+	glAttachShader(BasicShader, FragmentShaderID);
+	glLinkProgram(BasicShader);
+
+	// Check the program
+	glGetProgramiv(BasicShader, GL_LINK_STATUS, &Result);
+	glGetProgramiv(BasicShader, GL_INFO_LOG_LENGTH, &InfoLogLength);
+	if (InfoLogLength > 0) {
+		std::vector<char> ProgramErrorMessage(InfoLogLength + 1);
+		glGetProgramInfoLog(BasicShader, InfoLogLength, NULL, &ProgramErrorMessage[0]);
+		printf("%s\n", &ProgramErrorMessage[0]);
+	}
+
+	glDetachShader(BasicShader, VertexShaderID);
+	glDetachShader(BasicShader, FragmentShaderID);
+
+	glDeleteShader(VertexShaderID);
+	glDeleteShader(FragmentShaderID);
+
+	ERR = 0;
+	if ((ERR = glGetError()))
+	{
+		Print("Error" << ERR);
+		__debugbreak();
+	}
+}
 
 
 
 
-
-
-
-
-
-
-
+//std::ifstream VertexShaderStream(vertex_file_path, std::ios::in);
+//if (VertexShaderStream.is_open()) {
+//	std::stringstream sstr;
+//	sstr << VertexShaderStream.rdbuf();
+//	VertexShaderCode = sstr.str();
+//	VertexShaderStream.close();
+//}
+//else {
+//	printf("Impossible to open %s. Are you in the right directory ? Don't forget to read the FAQ !\n", vertex_file_path);
+//	getchar();
+//	return 0;
+//}
+//std::ifstream FragmentShaderStream(fragment_file_path, std::ios::in);
+//if (FragmentShaderStream.is_open()) {
+//	std::stringstream sstr;
+//	sstr << FragmentShaderStream.rdbuf();
+//	FragmentShaderCode = sstr.str();
+//	FragmentShaderStream.close();
+//}
+	// Read the Fragment Shader code from the file
 
 /*
 

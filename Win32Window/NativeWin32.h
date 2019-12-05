@@ -40,8 +40,6 @@ _________________________________________________________
 
  Changes with Window size and OpenGL Viewport settings 
     void ResizeWindow(uint32_t _x, uint32_t _y);  
-
-
 */
 
 /// Awesome conversion of a basic Win32 Hello Window to every language imaginable 
@@ -354,36 +352,36 @@ public:
 	Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _name, DWORD _flags = 0);
 
 	/* Returns Windows Position */
-	Vec2   g_Position()           { return Position; }
+	Vec2   g_Position() const noexcept       { return Position; }
 
 	/* Returns X location of Window on Screen */
-	float  g_PositionX()          { return Position.x; }
+	float  g_PositionX() const noexcept      { return Position.x; }
 
 	/* Returns Y location of Window on Screen */
-	float  g_PositionY()          { return Position.y; }
+	float  g_PositionY() const noexcept      { return Position.y; }
 
 	/* Sets the location of a Window */
-	Vec2   s_Position(Vec2 _pos)  { Position = _pos; }
+	Vec2   s_Position(Vec2 _pos)  noexcept   { Position = _pos; }
 
 	/* Sets the X location for a Window */
-	Vec2   s_PositionX(float _x)  { Position.x = _x; }
+	Vec2   s_PositionX(float _x) noexcept    { Position.x = _x; }
 
 	/* Sets the Y location for a Window */
-	Vec2   s_PositionY(float _y)  { Position.y = _y; }
+	Vec2   s_PositionY(float _y) noexcept    { Position.y = _y; }
 
 	/* return the Dimensions of a Window */
-	Vec2 g_Size()                 { return Size; }
+	Vec2   g_Size() const noexcept           { return Size; }
 
 	/* Return the Width dimension of a Window */
-	int Width()                   { return (int)Size.x; }
+	int    Width() const noexcept            { return (int)Size.x; }
 
 	/* Return the Height Dimension of a Window */
-	int Height()                  { return (int)Size.y; }
+	int    Height() const noexcept           { return (int)Size.y; }
 
 	/* Return if the Window is Alive  
 	Note: A Window can be invisible and still be Alive. When the final Window is no longer Alive our Application will terminate
 	*/
-	bool isAlive() const   { return Alive; }
+	bool   isAlive() const noexcept          { return Alive; }
 
 	/* Let us know if the Window is currently Visible on Screen 
 	Note: Intentions are to hide all child Windows if Parent becomes invisible*/

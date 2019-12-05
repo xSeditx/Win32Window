@@ -171,7 +171,12 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 			__debugbreak();
 		};
 
-		//	MessageBoxA(0, (char*)glGetString(GL_VERSION), "OPENGL VERSION", 0);
+		Title = std::string("OPENGL VERSION ") + std::string((char*)glGetString(GL_VERSION));
+		SetWindowTextA
+		(
+			Handle,
+			Title.c_str()
+		);
 
 		//  wglCreateContext	    Creates a new rendering context.
 		//  WglMakeCurrent	        Sets a thread's current rendering context.
@@ -203,7 +208,7 @@ Window::Window(uint32_t _width, uint32_t _height, std::string _name, DWORD _flag
 	{
 #ifdef _FULL_SCREEN_MODE
 
-			DEVMODE dmScreenSettings;                   // Device Mode
+		DEVMODE dmScreenSettings;                   // Device Mode
 		memset(&dmScreenSettings,0,sizeof(dmScreenSettings));       // Makes Sure Memory's Cleared
 		dmScreenSettings.dmSize=sizeof(dmScreenSettings);       // Size Of The Devmode Structure
 		dmScreenSettings.dmPelsWidth    = width;            // Selected Screen Width
@@ -224,7 +229,7 @@ Window::Window(Window *_parent, uint32_t _width, uint32_t _height, std::string _
 /* Display the contents of the back buffer to the Screen (*note:future at VSync if Specified) */
 void Window::Sync()
 {	
-	SwapBuffers(DeviceContext);// 
+	SwapBuffers(DeviceContext);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -236,11 +241,12 @@ void Window::CLS()
 
 void Window::ResizeWindow(uint32_t _width, uint32_t _height)             // Resize And Initialize The GL Window
 {/// NOTE :https://stackoverflow.com/questions/692742/how-do-you-programmatically-resize-and-move-windows-with-the-windows-api
-	if (this == nullptr)return;
-	if (_height >= 0)                              // Prevent A Divide By Zero By
+	if (!this)return;
+	if (_height <= 0)                              // Prevent A Divide By Zero By
 	{
 		_height = 1;                           // Making Height Equal One
 	}
+
 	Size = { (float)_width,(float)_height };
 
 	glViewport(0, 0, _width, _height);                    // Reset The Current Viewport
@@ -254,7 +260,8 @@ void Window::ResizeWindow(uint32_t _width, uint32_t _height)             // Resi
 	glMatrixMode(GL_MODELVIEW);                     // Select The Modelview Matrix
 	glLoadIdentity();                           // Reset The Modelview Matrix
 
-	 MoveWindow(
+	 MoveWindow
+	 (
 		Handle,
 		(int)Position.x,
 		(int)Position.y,
@@ -283,21 +290,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 		else
 		{
-			Print("Inactive");                    // Program Is No Longer Active
+			Print("Inactive");              // Program Is No Longer Active
 		}
 
-		break;                       // Return To The Message Loop
+		break;                              // Return To The Message Loop
 	}
 
 	case WM_SYSCOMMAND:                     // Intercept System Commands
 	{
 		switch (wParam)                     // Check System Calls
 		{
-		case SC_SCREENSAVE:             // Screensaver Trying To Start?
+		case SC_SCREENSAVE:                 // Screensaver Trying To Start?
 		case SC_MONITORPOWER:               // Monitor Trying To Enter Powersave?
-			return 0;                   // Prevent From Happening
-		}
-		break;                          // Exit
+			return 0;                       // Prevent From Happening
+		}								    
+		break;                              // Exit
 	}
 
 	case WM_CLOSE:                          // Did We Receive A Close Message?
@@ -410,7 +417,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return DefWindowProc(hwnd, uMsg, wParam, lParam);
 	}
 
-	return 0;
+	return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 

@@ -47,5 +47,8 @@
     <ClInclude Include="glad.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="vMath.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
